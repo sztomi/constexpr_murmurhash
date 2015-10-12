@@ -73,22 +73,8 @@ TEST(mm_x86_32_test, endian_order_two_chars) {
   EXPECT_EQ(0x74875592, mm3_x86_32("ab", 0x9747b28c));
 }
 
-TEST(mm_x86_32_test, endian_order_one_chunk) {
-  const char input[] = {char(0x21), char(0x43), char(0x65), char(0x87)};
-  EXPECT_EQ(0xF55B516B, mm3_x86_32(input, 4, 0));
-}
-
-TEST(mm_x86_32_test, special_seed_eliminates_initial_input) {
-  const char input[] = {char(0x21), char(0x43), char(0x65), char(0x87)};
-  EXPECT_EQ(0x2362F9DE, mm3_x86_32(input, 4, 0x5082EDEE));
-}
-
 TEST(mm_x86_32_test, hello_world) {
   EXPECT_EQ(0x24884CBA, mm3_x86_32("Hello, world!", 0x9747b28c));
-}
-
-TEST(mm_x86_32_test, utf8_characters) {
-  EXPECT_EQ(0xD58063C1, mm3_x86_32("ππππππππ", 0x9747b28c));
 }
 
 TEST(mm_x86_32_test, long_str) {

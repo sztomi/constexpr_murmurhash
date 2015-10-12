@@ -19,7 +19,6 @@
 // LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 // THE SOFTWARE.
-
 #pragma once
 
 #ifndef CONSTEXPR_MURMUR3_HASH_CONSTEXPR_MURMUR3_H
@@ -33,8 +32,6 @@ namespace ce_mm3 {
 // http://en.cppreference.com/w/cpp/concept/LiteralType
 class str_view {
 public:
-  constexpr str_view() : p(nullptr), sz(0) {}
-
   template <std::size_t N>
   constexpr str_view(const char(&a)[N])
       : p(a), sz(N - 1) {}
@@ -43,31 +40,38 @@ public:
     return n < sz ? p[n] : throw std::out_of_range("");
   }
 
+  constexpr uint32_t get_block(int idx) {
+    int i = (block_size() + idx) * 4;
+    uint32_t b0 = p[i];
+    uint32_t b1 = p[i + 1];
+    uint32_t b2 = p[i + 2];
+    uint32_t b3 = p[i + 3];
+    return (b3 << 24) | (b2 << 16) | (b1 << 8) | b0;
+  }
+
   constexpr std::size_t size() const { return sz; }
 
-  constexpr const char *str() const { return p; }
+  constexpr std::size_t block_size() const { return sz / 4; }
+
+  constexpr char tail(const int n) const {
+    int tail_size = sz % 4;
+    return p[sz - tail_size + n];
+  }
 
 private:
   const char *p;
   std::size_t sz;
 };
 
-// Calling __builtin_constant_p will force constant folding
-#define ce_mm3_fold(x) __builtin_constant_p(x) ? (x) : (x)
-
-constexpr uint32_t mm3_x86_32(const char *key, int len, uint32_t seed) {
-  const int nblocks = len / 4;
-
-  const uint8_t *data = ce_mm3_fold(reinterpret_cast<const uint8_t *>(key));
+constexpr uint32_t mm3_x86_32(str_view key, uint32_t seed) {
   uint32_t h1 = seed;
 
   const uint32_t c1 = 0xcc9e2d51;
   const uint32_t c2 = 0x1b873593;
 
-  const uint32_t *blocks = ce_mm3_fold((const uint32_t *)(data + nblocks * 4));
-
+  const int nblocks = key.size() / 4;
   for (int i = -nblocks; i; i++) {
-    uint32_t k1 = blocks[i];
+    uint32_t k1 = key.get_block(i);
 
     k1 *= c1;
     k1 = (k1 << 15) | (k1 >> (32 - 15));
@@ -78,24 +82,23 @@ constexpr uint32_t mm3_x86_32(const char *key, int len, uint32_t seed) {
     h1 = h1 * 5 + 0xe6546b64;
   }
 
-  const uint8_t *tail = (const uint8_t *)(data + nblocks * 4);
-
   uint32_t k1 = 0;
+  char t = key.tail(0);
 
-  switch (len & 3) {
+  switch (key.size() & 3) {
   case 3:
-    k1 ^= tail[2] << 16;
+    k1 ^= key.tail(2) << 16;
   case 2:
-    k1 ^= tail[1] << 8;
+    k1 ^= key.tail(1) << 8;
   case 1:
-    k1 ^= tail[0];
+    k1 ^= key.tail(0);
     k1 *= c1;
     k1 = (k1 << 15) | (k1 >> (32 - 15));
     k1 *= c2;
     h1 ^= k1;
   };
 
-  h1 ^= len;
+  h1 ^= key.size();
 
   h1 ^= h1 >> 16;
   h1 *= 0x85ebca6b;
@@ -105,12 +108,6 @@ constexpr uint32_t mm3_x86_32(const char *key, int len, uint32_t seed) {
 
   return h1;
 }
-
-constexpr uint32_t mm3_x86_32(str_view s, uint32_t seed) {
-  return mm3_x86_32(s.str(), s.size(), seed);
-}
-
-#undef ce_mm3_fold
 }
 
 #endif
